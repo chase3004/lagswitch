@@ -1,0 +1,166 @@
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+
+local coreGui = game:GetService("CoreGui")
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+
+-- SETTINGS
+local LAG_DURATION = 0.4 -- lag duration (milliseconds)
+local LAG_INTENSITY = 50000 -- lag intensity (I recommend, don't change this value)
+local BUTTON_SIZE = Vector2.new(200, 80)
+local BUTTON_TRANSPARENCY = 0.7
+local OUTLINE_THICKNESS = 3
+local TEXT_PADDING = 20 -- Keeps text inside the button
+
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CleanLagButton"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = coreGui
+
+-- Main Button Container
+local buttonContainer = Instance.new("Frame")
+buttonContainer.Name = "ButtonContainer"
+buttonContainer.Size = UDim2.new(0, BUTTON_SIZE.X, 0, BUTTON_SIZE.Y)
+buttonContainer.Position = UDim2.new(0.5, -BUTTON_SIZE.X/2, 0.8, -BUTTON_SIZE.Y/2)
+buttonContainer.BackgroundTransparency = 1
+buttonContainer.Parent = screenGui
+
+-- Main Button
+local button = Instance.new("TextButton")
+button.Name = "lag"
+button.Size = UDim2.new(1, 0, 1, 0)
+button.Position = UDim2.new(0, 0, 0, 0)
+button.BackgroundColor3 = Color3.fromRGB(230, 46, 46)
+button.BackgroundTransparency = BUTTON_TRANSPARENCY
+button.Text = "LAG"
+button.Font = Enum.Font.ArialBold
+button.TextSize = 32
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.TextStrokeTransparency = 1
+button.TextXAlignment = Enum.TextXAlignment.Center -- Center text always
+button.TextYAlignment = Enum.TextYAlignment.Center
+button.AutoButtonColor = false
+button.ClipsDescendants = true -- Prevents any content from going outside
+button.Parent = buttonContainer
+
+-- Button Styling
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0.15, 0)
+corner.Parent = button
+
+local buttonOutline = Instance.new("UIStroke")
+buttonOutline.Color = Color3.fromRGB(0, 0, 0)
+buttonOutline.Thickness = OUTLINE_THICKNESS
+buttonOutline.Transparency = 0
+buttonOutline.Parent = button
+
+-- Lock Indicator (Positioned Inside Button)
+local lockIndicator = Instance.new("TextLabel")
+lockIndicator.Name = "LockIndicator"
+lockIndicator.Size = UDim2.new(0, 30, 0, 30)
+lockIndicator.Position = UDim2.new(1, -TEXT_PADDING - 25, 0.5, -15) -- Inside right edge
+lockIndicator.BackgroundTransparency = 1
+lockIndicator.Text = "🔒"
+lockIndicator.Font = Enum.Font.ArialBold
+lockIndicator.TextSize = 24
+lockIndicator.TextColor3 = Color3.fromRGB(255, 255, 255)
+lockIndicator.Visible = false
+lockIndicator.Parent = button
+
+-- Runtime Variables
+local isDragging = false
+local isPositionLocked = false
+local isLagging = false
+local activeLagConnection = nil
+local holdStartTime = nil
+local dragStartPos = Vector2.new()
+local containerStartPos = UDim2.new()
+
+-- Input Handling
+button.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    
+    holdStartTime = os.clock()
+    isDragging = not isPositionLocked
+    
+    if isDragging then
+        dragStartPos = input.Position
+        containerStartPos = buttonContainer.Position
+    end
+end)
+
+button.InputEnded:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    
+    if not holdStartTime then return end
+    local holdDuration = os.clock() - holdStartTime
+    holdStartTime = nil
+    isDragging = false
+
+    -- Toggle lock with proper text alignment
+    if holdDuration >= 0.5 then
+        isPositionLocked = not isPositionLocked
+        
+        -- Update visuals
+        if isPositionLocked then
+            button.BackgroundColor3 = Color3.fromRGB(200, 46, 46)
+            lockIndicator.Visible = true
+            buttonOutline.Color = Color3.fromRGB(50, 50, 50)
+        else
+            button.BackgroundColor3 = Color3.fromRGB(230, 46, 46)
+            lockIndicator.Visible = false
+            buttonOutline.Color = Color3.fromRGB(0, 0, 0)
+        end
+    else
+        -- Trigger lag
+        if not isLagging then
+            isLagging = true
+            button.Text = "LAGGING"
+            button.BackgroundColor3 = Color3.fromRGB(46, 139, 87)
+
+            local startTime = os.clock()
+            activeLagConnection = runService.RenderStepped:Connect(function()
+                local elapsedTime = os.clock() - startTime
+                if elapsedTime >= LAG_DURATION then
+                    if activeLagConnection then
+                        activeLagConnection:Disconnect()
+                        activeLagConnection = nil
+                    end
+                    isLagging = false
+                    button.Text = "LAG"
+                    button.BackgroundColor3 = isPositionLocked and Color3.fromRGB(200, 46, 46) or Color3.fromRGB(230, 46, 46)
+                    return
+                end
+
+                for i = 1, LAG_INTENSITY do
+                    local x = math.random() * math.random() * math.random()
+                    for j = 1, 10 do
+                        x = x ^ math.random()
+                        x = math.sin(x) * math.cos(x) * math.tan(x)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Drag Movement
+userInputService.InputChanged:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    
+    if isDragging and not isPositionLocked then
+        local delta = input.Position - dragStartPos
+        buttonContainer.Position = UDim2.new(
+            containerStartPos.X.Scale, containerStartPos.X.Offset + delta.X,
+            containerStartPos.Y.Scale, containerStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Enable GUI
+screenGui.Enabled = true
+button.Active = true
+button.Selectable = true
